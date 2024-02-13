@@ -3,81 +3,64 @@ package main
 import (
 	"context"
 	"flag"
-	"io"
+	"fmt"
+	"github.com/reeflective/console"
+	"github.com/reeflective/readline"
 	"log"
-
-	"github.com/bishopfox/sliver/client/assets"
-	consts "github.com/bishopfox/sliver/client/constants"
-	"github.com/bishopfox/sliver/client/transport"
-	"github.com/bishopfox/sliver/protobuf/clientpb"
-	"github.com/bishopfox/sliver/protobuf/commonpb"
-	"github.com/bishopfox/sliver/protobuf/sliverpb"
+	"os"
 )
 
-func makeRequest(session *clientpb.Session) *commonpb.Request {
-	if session == nil {
-		return nil
-	}
-	timeout := int64(60)
-	return &commonpb.Request{
-		SessionID: session.ID,
-		Timeout:   timeout,
-	}
-}
+var (
+	client SliverConnection
+	app    *console.Console
+	ctx    context.Context
+)
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	var configPath string
 	flag.StringVar(&configPath, "config", "", "path to sliver client config file")
 	flag.Parse()
+	app = console.New("sliver-automate")
+	app.SetPrintLogo(func(_ *console.Console) {
+		fmt.Print(`
+  _________.__  .__                        _____          __                         __          
+ /   _____/|  | |__|__  __ ___________    /  _  \  __ ___/  |_  ____   _____ _____ _/  |_  ____  
+ \_____  \ |  | |  \  \/ // __ \_  __ \  /  /_\  \|  |  \   __\/  _ \ /     \\__  \\   __\/ __ \ 
+ /        \|  |_|  |\   /\  ___/|  | \/ /    |    \  |  /|  | (  <_> )  Y Y  \/ __ \|  | \  ___/ 
+/_______  /|____/__| \_/  \___  >__|    \____|__  /____/ |__|  \____/|__|_|  (____  /__|  \___  >
+        \/                    \/                \/                         \/     \/          \/
+`)
+	})
 
-	// load the client configuration from the filesystem
-	config, err := assets.ReadConfig(configPath)
-	if err != nil {
-		log.Fatal(err)
+	mainMenu := app.ActiveMenu()
+	interactMenu := app.NewMenu("interact")
+	interactMenu.AddInterrupt(readline.ErrInterrupt, returnToMain)
+	mainMenu.AddInterrupt(readline.ErrInterrupt, exitConsole)
+	hist, _ := embeddedHistory(".example-history.txt")
+	mainMenu.AddHistorySource("local history", hist)
+
+	mainMenu.SetCommands(menuCommands)
+	interactMenu.SetCommands(interactBeaconCommands)
+	client.sliverConnect(configPath)
+	apperr := app.Start()
+	if apperr != nil {
+		log.Fatal(apperr)
 	}
-	// connect to the server
-	rpc, ln, err := transport.MTLSConnect(config)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println("[*] Connected to sliver server")
-	defer ln.Close()
 
-	// Open the event stream to be able to collect all events sent by  the server
-	eventStream, err := rpc.Events(context.Background(), &commonpb.Empty{})
-	if err != nil {
-		log.Fatal(err)
-	}
+}
 
-	// infinite loop
-	for {
-		event, err := eventStream.Recv()
-		if err == io.EOF || event == nil {
-			return
-		}
-		// Trigger event based on type
-		switch event.EventType {
+func returnToMain(_ *console.Console) {
+	app.SwitchMenu("")
+}
 
-		// a new session just came in
-		case consts.SessionOpenedEvent:
-			session := event.Session
-			// call any RPC you want, for the full list, see
-			// https://github.com/BishopFox/sliver/blob/master/protobuf/rpcpb/services.proto
-			resp, err := rpc.Execute(context.Background(), &sliverpb.ExecuteReq{
-				Path:    `c:\windows\system32\calc.exe`,
-				Output:  false,
-				Request: makeRequest(session),
-			})
-			if err != nil {
-				log.Fatal(err)
-			}
-			// Don't forget to check for errors in the Response object
-			if resp.Response != nil && resp.Response.Err != "" {
-				log.Fatal(resp.Response.Err)
-			}
-		case consts.BeaconRegisteredEvent:
-			beacon := event.Session
+func exitConsole(_ *console.Console) {
+	//reader := bufio.NewReader(os.Stdin)
+	//fmt.Print("Confirm exit (Y/y, Ctrl-C): ")
+	//text, _ := reader.ReadString('\n')
+	//answer := strings.TrimSpace(text)
 
-		}
-	}
+	//if (answer == "Y") || (answer == "y") {
+	os.Exit(0)
+	//}
 }
