@@ -15,7 +15,9 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -452,6 +454,77 @@ func interactBeaconCommands() *cobra.Command {
 	executeCmd.Flags().BoolP("rwx-pages", "r", false, "Use RWX permissions for memory pages")
 	executeCmd.Flags().IntP("timeout", "t", 60, "command timeout in seconds")
 	rootCmd.AddCommand(executeshellcodeCmd)
+	sideloadCmd := &cobra.Command{
+		Use:   "sideload [flags] filepath [args...]",
+		Short: "Load and execute a shared object (shared library/DLL) in a remote process",
+		Args:  cobra.MinimumNArgs(1),
+		Run: func(cmd *cobra.Command, cmdargs []string) {
+			var beacons = ctx.Value("beacons").([]string)
+			binPath := cmdargs[0]
+
+			entryPoint := cmd.Flag("entry-point").Value.String()
+			processName := cmd.Flag("process").Value.String()
+			args := strings.Join(cmdargs[1:], " ")
+
+			binData, err := ioutil.ReadFile(binPath)
+			if err != nil {
+				app.Printf("\n%s", err.Error())
+				return
+			}
+			isDLL := (filepath.Ext(binPath) == ".dll")
+
+			var beaconWG sync.WaitGroup
+			beaconWG.Add(len(beacons))
+			timeout, _ := strconv.Atoi(cmd.Flag("timeout").Value.String())
+			allBeacons, err := client.rpc.GetBeacons(context.Background(), &commonpb.Empty{})
+			if err != nil {
+				app.Printf("Error in getting beacons: %s", err)
+			}
+			for beaconnum, beacon := range allBeacons.Beacons {
+				if slices.Contains(beacons, beacon.ID) {
+					if beaconnum != 0 {
+						if beacon.OS != allBeacons.Beacons[beaconnum-1].OS {
+							app.Printf("\nNot all beacons are of the same OS, please select another filter.")
+							return
+						}
+					}
+				}
+			}
+
+			for _, beacon := range beacons {
+				go func(beacon string) {
+					_, err := client.rpc.Sideload(context.Background(), &sliverpb.SideloadReq{
+						Request: &commonpb.Request{
+							Async:    false,
+							Timeout:  int64(timeout),
+							BeaconID: beacon,
+						},
+						Args:        args,
+						Data:        binData,
+						EntryPoint:  entryPoint,
+						ProcessName: processName,
+						Kill:        !cmd.Flag("keep-alive").Changed,
+						IsDLL:       isDLL,
+					})
+					if err != nil {
+						app.Printf("\nError: %v", err)
+						beaconWG.Done()
+						return
+					}
+					beaconWG.Done()
+				}(beacon)
+			}
+			beaconWG.Wait()
+		},
+	}
+	sideloadCmd.Flags().StringP("entry-point", "e", "", "Entrypoint for the DLL (Windows only)")
+	sideloadCmd.Flags().StringP("process", "p", `c:\windows\system32\notepad.exe`, "Path to process to host the shellcode")
+	//sideloadCmd.Flags().BoolP("save", "s", false, "save output to file")
+	//sideloadCmd.Flags().BoolP("loot", "X", false, "save output as loot")
+	//sideloadCmd.Flags().StringP("name", "n", "", "name to assign loot (optional)")
+	sideloadCmd.Flags().BoolP("keep-alive", "k", false, "don't terminate host process once the execution completes")
+	sideloadCmd.Flags().IntP("timeout", "t", 60, "command timeout in seconds")
+	rootCmd.AddCommand(sideloadCmd)
 	for _, cmd := range rootCmd.Commands() {
 		c := carapace.Gen(cmd)
 
