@@ -411,12 +411,12 @@ func interactBeaconCommands() *cobra.Command {
 		},
 	})
 	executeshellcodeCmd := &cobra.Command{
-		Use:   "execute-shellcode",
+		Use:   "execute-shellcode [flags] filepath",
 		Short: "Executes the given shellcode in the sliver process. Will inject into self (PID 0).",
-		Args:  cobra.MinimumNArgs(1),
+		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			var beacons = ctx.Value("beacons").([]string)
-			shellcodePath := cmd.Flag("filepath").Value.String()
+			shellcodePath := args[0]
 			shellcodeBin, err := ioutil.ReadFile(shellcodePath)
 			if err != nil {
 				app.Printf("\n%s\n", err.Error())
@@ -449,8 +449,8 @@ func interactBeaconCommands() *cobra.Command {
 			beaconWG.Wait()
 		},
 	}
-	executeCmd.Flags().BoolP("r", "rwx-pages", false, "Use RWX permissions for memory pages")
-	executeCmd.Flags().IntP("t", "timeout", 60, "command timeout in seconds")
+	executeCmd.Flags().BoolP("rwx-pages", "r", false, "Use RWX permissions for memory pages")
+	executeCmd.Flags().IntP("timeout", "t", 60, "command timeout in seconds")
 	rootCmd.AddCommand(executeshellcodeCmd)
 	for _, cmd := range rootCmd.Commands() {
 		c := carapace.Gen(cmd)
