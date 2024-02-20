@@ -55,12 +55,5 @@ func returnToMain(_ *console.Console) {
 }
 
 func exitConsole(_ *console.Console) {
-	//reader := bufio.NewReader(os.Stdin)
-	//fmt.Print("Confirm exit (Y/y, Ctrl-C): ")
-	//text, _ := reader.ReadString('\n')
-	//answer := strings.TrimSpace(text)
-
-	//if (answer == "Y") || (answer == "y") {
 	os.Exit(0)
-	//}
 }

