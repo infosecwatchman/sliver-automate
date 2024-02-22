@@ -619,6 +619,70 @@ func interactBeaconCommands() *cobra.Command {
 	chownCmd.Flags().BoolP("recursive", "r", false, "recursively change permissions on files")
 	chownCmd.Flags().IntP("timeout", "t", 60, "command timeout in seconds")
 	rootCmd.AddCommand(chownCmd)
+	chtimesCmd := &cobra.Command{
+		Use:   "chtimes [flags] path atime mtime",
+		Short: "Change access and modification times on a file (timestomp)",
+		Args:  cobra.ExactArgs(3),
+		Run: func(cmd *cobra.Command, args []string) {
+			var beacons = ctx.Value("beacons").([]string)
+			layout := "2006-01-02 15:04:05"
+			filePath := args[0]
+
+			if filePath == "" {
+				app.Printf("Missing parameter: file or directory name\n")
+				return
+			}
+
+			atime := args[1]
+
+			if atime == "" {
+				app.Printf("Missing parameter: Last accessed time id\n")
+				return
+			}
+
+			t_a, err := time.Parse(layout, atime)
+			if err != nil {
+				app.Printf("%s\n", err)
+				return
+			}
+			unixAtime := t_a.Unix()
+
+			mtime := args[2]
+
+			if mtime == "" {
+				app.Printf("Missing parameter: Last modified time id\n")
+				return
+			}
+
+			t_b, err := time.Parse(layout, mtime)
+			if err != nil {
+				app.Printf("%s\n", err)
+				return
+			}
+			unixMtime := t_b.Unix()
+
+			timeout, _ := strconv.Atoi(cmd.Flag("timeout").Value.String())
+			app.Printf("\n%s command sent to %d beacon(s)\n", strings.Split(cmd.Use, " ")[0], len(beacons))
+			AsyncBeacons(func(beacon string) error {
+				_, err := client.rpc.Chtimes(context.Background(), &sliverpb.ChtimesReq{
+					Request: &commonpb.Request{
+						Async:    true,
+						Timeout:  int64(timeout),
+						BeaconID: beacon,
+					},
+					Path:  filePath,
+					ATime: unixAtime,
+					MTime: unixMtime,
+				})
+				if err != nil {
+					return err
+				}
+				return nil
+			}, beacons)
+		},
+	}
+	chtimesCmd.Flags().IntP("timeout", "t", 60, "command timeout in seconds")
+	rootCmd.AddCommand(chtimesCmd)
 	for _, cmd := range rootCmd.Commands() {
 		c := carapace.Gen(cmd)
 
