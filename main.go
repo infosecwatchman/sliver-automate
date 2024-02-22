@@ -37,9 +37,8 @@ func main() {
 	interactMenu := app.NewMenu("interact")
 	interactMenu.AddInterrupt(readline.ErrInterrupt, returnToMain)
 	mainMenu.AddInterrupt(readline.ErrInterrupt, exitConsole)
-	hist, _ := embeddedHistory(".example-history.txt")
-	mainMenu.AddHistorySource("local history", hist)
-
+	mainMenu.AddHistorySourceFile("history", ".history")
+	interactMenu.AddHistorySourceFile("history", ".history")
 	mainMenu.SetCommands(menuCommands)
 	interactMenu.SetCommands(interactBeaconCommands)
 	client.sliverConnect(configPath)
