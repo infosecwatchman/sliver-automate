@@ -32,6 +32,8 @@ require (
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rsteube/carapace-shlex v0.1.2 // indirect
+	github.com/sirupsen/logrus v1.9.2 // indirect
+	golang.org/x/crypto v0.19.0 // indirect
 	golang.org/x/exp v0.0.0-20240213143201-ec583247a57a // indirect
 	golang.org/x/net v0.21.0 // indirect
 	golang.org/x/sys v0.17.0 // indirect
