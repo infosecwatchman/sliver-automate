@@ -8,15 +8,18 @@ import (
 	"github.com/bishopfox/sliver/protobuf/clientpb"
 	"github.com/bishopfox/sliver/protobuf/commonpb"
 	"github.com/bishopfox/sliver/protobuf/sliverpb"
+	"github.com/bishopfox/sliver/util/encoders"
 	"github.com/rodaine/table"
 	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"gopkg.in/AlecAivazis/survey.v1"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -683,6 +686,141 @@ func interactBeaconCommands() *cobra.Command {
 	}
 	chtimesCmd.Flags().IntP("timeout", "t", 60, "command timeout in seconds")
 	rootCmd.AddCommand(chtimesCmd)
+	downloadCmd := &cobra.Command{
+		Use:   "download [flags] remote-path [local-path]",
+		Short: "Download a file",
+		Args:  cobra.MinimumNArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			var beacons = ctx.Value("beacons").([]string)
+			remotePath := args[0]
+			var localPath string
+			switch len(args) {
+			case 2:
+				localPath = args[1]
+			case 1:
+				localPath = "."
+			default:
+				app.Printf("Invalid number of arguments.")
+				return
+			}
+			recurse := cmd.Flag("recurse").Changed
+			timeout, _ := strconv.Atoi(cmd.Flag("timeout").Value.String())
+			app.Printf("\n%s command sent to %d beacon(s)\n", strings.Split(cmd.Use, " ")[0], len(beacons))
+			AsyncBeacons(func(beacon string) error {
+				download, err := client.rpc.Download(context.Background(), &sliverpb.DownloadReq{
+					Request: &commonpb.Request{
+						Async:    true,
+						Timeout:  int64(timeout),
+						BeaconID: beacon,
+					},
+					Path:    remotePath,
+					Recurse: recurse,
+				})
+				if err != nil {
+					return err
+				}
+				if download.Response != nil && download.Response.Err != "" {
+					app.Printf("%s\n", download.Response.Err)
+					return err
+				}
+
+				if download.Encoder == "gzip" {
+					download.Data, err = new(encoders.Gzip).Decode(download.Data)
+					if err != nil {
+						app.Printf("Decoding failed %s", err)
+					}
+				}
+
+				if download.ReadFiles == 0 {
+					// No files downloaded successfully.
+					app.Printf("No files downloaded from the implant - check permissions, path, and / or filters.\n")
+					return err
+				}
+
+				fileName := filepath.Base(remotePath)
+				dst, err := filepath.Abs(localPath)
+				if err != nil {
+					app.Printf("%s\n", err)
+					return err
+				}
+
+				fi, err := os.Stat(dst)
+				if err != nil && !os.IsNotExist(err) {
+					app.Printf("%s\n", err)
+					return err
+				}
+				if err == nil && fi.IsDir() {
+					if download.IsDir {
+						// Come up with a good file name - filters might make the filename ugly
+						implant, _ := client.rpc.GetBeacon(context.Background(), &clientpb.Beacon{ID: beacon})
+						implantName := implant.Name
+						fileName = fmt.Sprintf("%s_download_%s_%d.tar.gz", filepath.Base(implantName), filepath.Base(prettifyDownloadName(remotePath)), time.Now().Unix())
+					}
+					if runtime.GOOS == "windows" {
+						// Windows has a file path length of 260 characters
+						// +1 for the path separator before the file name
+						if len(dst)+len(fileName)+1 > 260 {
+							// Make an effort to shorten the file name. If this does not work, the operator will have to find somewhere else to put the file
+							fileName = fmt.Sprintf("down_%d.tar.gz", time.Now().Unix())
+						}
+					}
+					dst = filepath.Join(dst, fileName)
+				}
+
+				// Add an extension to a directory download if one is not provided.
+				if download.IsDir && (!strings.HasSuffix(dst, ".tgz") && !strings.HasSuffix(dst, ".tar.gz")) {
+					dst += ".tar.gz"
+				}
+
+				if _, err := os.Stat(dst); err == nil {
+					overwrite := false
+					prompt := &survey.Confirm{Message: "Overwrite local file?"}
+					survey.AskOne(prompt, &overwrite, nil)
+					if !overwrite {
+						return err
+					}
+				}
+
+				dstFile, err := os.Create(dst)
+				if err != nil {
+					app.Printf("Failed to open local file %s: %s\n", dst, err)
+					return err
+				}
+				defer dstFile.Close()
+				n, err := dstFile.Write(download.Data)
+				if err != nil {
+					app.Printf("Failed to write data %v\n", err)
+				} else {
+					var readFilesText string
+					var unreadFilesText string
+
+					if download.ReadFiles == 1 {
+						readFilesText = "file"
+					} else {
+						readFilesText = "files"
+					}
+
+					if download.UnreadableFiles == 1 {
+						unreadFilesText = "file"
+					} else {
+						unreadFilesText = "files"
+					}
+
+					app.Printf("Wrote %d bytes (%d %s successfully, %d %s unsuccessfully) to %s\n",
+						n,
+						download.ReadFiles,
+						readFilesText,
+						download.UnreadableFiles,
+						unreadFilesText,
+						dstFile.Name())
+				}
+
+				return nil
+			}, beacons)
+		},
+	}
+	downloadCmd.Flags().IntP("timeout", "t", 60, "command timeout in seconds")
+	downloadCmd.Flags().BoolP("recurse", "r", false, "recursively download all files in a directory")
 	for _, cmd := range rootCmd.Commands() {
 		c := carapace.Gen(cmd)
 
@@ -709,21 +847,4 @@ func interactBeaconCommands() *cobra.Command {
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
 	rootCmd.DisableFlagsInUseLine = true
 	return rootCmd
-}
-
-func AsyncBeacons(command func(beacon string) error, beacons []string) {
-	var beaconWG sync.WaitGroup
-	beaconWG.Add(len(beacons))
-	for _, beacon := range beacons {
-		go func(beacon string) {
-			err := command(beacon)
-			if err != nil {
-				app.Printf("%s\n\n", err)
-				beaconWG.Done()
-				return
-			}
-			beaconWG.Done()
-		}(beacon)
-	}
-	beaconWG.Wait()
 }
