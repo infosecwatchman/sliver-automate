@@ -35,15 +35,90 @@ func menuCommands() *cobra.Command {
 	}
 	searchCmd := &cobra.Command{
 		Use:   "search",
-		Short: "Search for beacons with given regex.",
-		Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+		Short: "Search for beacons with given regex. Useful for testing filters or regex matches.",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("search called")
+			filter := cmd.Flag("filter").Value.String()
+
+			var filterRegex *regexp.Regexp
+			if cmd.Flag("filter-re").Value.String() != "" {
+				var err error
+				filterRegex, err = regexp.Compile(cmd.Flag("filter-re").Value.String())
+				if err != nil {
+					app.Printf("%s\n", err)
+					return
+				}
+			}
+			beacons, err := client.rpc.GetBeacons(context.Background(), &commonpb.Empty{})
+			if err != nil {
+				app.Printf("Error in getting beacons: %s", err)
+			}
+			if len(beacons.Beacons) == 0 {
+				app.Printf("No beacons 🙁\n")
+				return
+			} else {
+				var filteredBeacons []string
+				tbl := table.New("ID", "Name", "Transport", "RemoteAddress", "Hostname", "Username", "OS")
+				for _, beacon := range beacons.Beacons {
+					filteredBeacon := []string{
+						strings.Split(beacon.ID, "-")[0],
+						beacon.Name,
+						beacon.Transport,
+						beacon.RemoteAddress,
+						beacon.Hostname,
+						strings.TrimPrefix(beacon.Username, beacon.Hostname+"\\"),
+						fmt.Sprintf("%s/%s", beacon.OS, beacon.Arch),
+					}
+					//filteredBeacon = [strings.Split(beacon.ID, "-")[0], beacon.Name, ]
+					if filter == "" && filterRegex == nil {
+						tbl.AddRow(strings.Split(beacon.ID, "-")[0],
+							beacon.Name,
+							beacon.Transport,
+							beacon.RemoteAddress,
+							beacon.Hostname,
+							strings.TrimPrefix(beacon.Username, beacon.Hostname+"\\"),
+							fmt.Sprintf("%s/%s", beacon.OS, beacon.Arch))
+						filteredBeacons = append(filteredBeacons, beacon.ID)
+					} else {
+						for _, rowEntry := range filteredBeacon {
+							if filter != "" {
+								if strings.Contains(rowEntry, filter) {
+									tbl.AddRow(strings.Split(beacon.ID, "-")[0],
+										beacon.Name,
+										beacon.Transport,
+										beacon.RemoteAddress,
+										beacon.Hostname,
+										strings.TrimPrefix(beacon.Username, beacon.Hostname+"\\"),
+										fmt.Sprintf("%s/%s", beacon.OS, beacon.Arch))
+									filteredBeacons = append(filteredBeacons, beacon.ID)
+									break
+								}
+							}
+							if filterRegex != nil {
+								if filterRegex.MatchString(rowEntry) {
+									tbl.AddRow(strings.Split(beacon.ID, "-")[0],
+										beacon.Name,
+										beacon.Transport,
+										beacon.RemoteAddress,
+										beacon.Hostname,
+										strings.TrimPrefix(beacon.Username, beacon.Hostname+"\\"),
+										fmt.Sprintf("%s/%s", beacon.OS, beacon.Arch))
+									filteredBeacons = append(filteredBeacons, beacon.ID)
+									break
+								}
+							}
+						}
+					}
+					//tbl.AddRow(beacon.ID, beacon.Name, beacon.RemoteAddress, beacon.PID, beacon.Filename, beacon.Username, beacon.OS, beacon.IsDead, next)
+				}
+				app.Printf("%d beacons selected...\n", len(filteredBeacons))
+				if len(filteredBeacons) <= 5 {
+					tbl.Print()
+					time.Sleep(10 * time.Millisecond)
+				}
+
+				ctx = context.WithValue(context.Background(), "beaconTable", tbl)
+				ctx = context.WithValue(ctx, "beacons", filteredBeacons)
+			}
 		},
 	}
 	triggerCmd := &cobra.Command{
@@ -163,7 +238,6 @@ to quickly create a Cobra application.`,
 	selectBeaconCmd.Flags().StringP("filter", "f", "", "filter beacons by substring")
 	selectBeaconCmd.Flags().StringP("filter-re", "e", "", "filter beacons by regular expression")
 	interactCmd.AddCommand(selectBeaconCmd)
-
 	exitCmd := &cobra.Command{
 		Use:   "exit",
 		Short: "Exit sliver-automate console.",
@@ -242,9 +316,7 @@ to quickly create a Cobra application.`,
 
 		c.FlagCompletion(flagMap)
 	}
-
 	rootCmd.InitDefaultHelpCmd()
-
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
 	rootCmd.DisableFlagsInUseLine = true
 	return rootCmd
