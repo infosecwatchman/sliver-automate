@@ -568,6 +568,57 @@ func interactBeaconCommands() *cobra.Command {
 	chmodCmd.Flags().BoolP("recursive", "r", false, "recursively change permissions on files")
 	chmodCmd.Flags().IntP("timeout", "t", 60, "command timeout in seconds")
 	rootCmd.AddCommand(chmodCmd)
+	chownCmd := &cobra.Command{
+		Use:   "chown [flags] path uid gid",
+		Short: "Change owner on a file or directory",
+		Args:  cobra.ExactArgs(3),
+		Run: func(cmd *cobra.Command, args []string) {
+			var beacons = ctx.Value("beacons").([]string)
+
+			filePath := args[0]
+
+			if filePath == "" {
+				app.Printf("Missing parameter: file or directory name\n")
+				return
+			}
+
+			uid := args[1]
+
+			if uid == "" {
+				app.Printf("Missing parameter: user id\n")
+				return
+			}
+
+			gid := args[2]
+
+			if gid == "" {
+				app.Printf("Missing parameter: group id\n")
+				return
+			}
+			timeout, _ := strconv.Atoi(cmd.Flag("timeout").Value.String())
+			app.Printf("\n%s command sent to %d beacon(s)\n", strings.Split(cmd.Use, " ")[0], len(beacons))
+			AsyncBeacons(func(beacon string) error {
+				_, err := client.rpc.Chown(context.Background(), &sliverpb.ChownReq{
+					Request: &commonpb.Request{
+						Async:    true,
+						Timeout:  int64(timeout),
+						BeaconID: beacon,
+					},
+					Path:      filePath,
+					Uid:       uid,
+					Gid:       gid,
+					Recursive: cmd.Flag("recursive").Changed,
+				})
+				if err != nil {
+					return err
+				}
+				return nil
+			}, beacons)
+		},
+	}
+	chownCmd.Flags().BoolP("recursive", "r", false, "recursively change permissions on files")
+	chownCmd.Flags().IntP("timeout", "t", 60, "command timeout in seconds")
+	rootCmd.AddCommand(chownCmd)
 	for _, cmd := range rootCmd.Commands() {
 		c := carapace.Gen(cmd)
 
@@ -596,7 +647,7 @@ func interactBeaconCommands() *cobra.Command {
 	return rootCmd
 }
 
-func AsyncBeacons(command func(command string) error, beacons []string) {
+func AsyncBeacons(command func(beacon string) error, beacons []string) {
 	var beaconWG sync.WaitGroup
 	beaconWG.Add(len(beacons))
 	for _, beacon := range beacons {
