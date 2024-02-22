@@ -821,6 +821,72 @@ func interactBeaconCommands() *cobra.Command {
 	}
 	downloadCmd.Flags().IntP("timeout", "t", 60, "command timeout in seconds")
 	downloadCmd.Flags().BoolP("recurse", "r", false, "recursively download all files in a directory")
+	uploadCmd := &cobra.Command{
+		Use:   "upload [flags] local-path [remote-path]",
+		Short: "Upload a file to the remote system.",
+		Args:  cobra.MinimumNArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			var beacons = ctx.Value("beacons").([]string)
+			localPath := args[0]
+			var remotePath string
+			switch len(args) {
+			case 2:
+				remotePath = args[1]
+			case 1:
+				remotePath = "."
+			default:
+				app.Printf("Invalid number of arguments.")
+				return
+			}
+			isIOC := cmd.Flag("ioc").Changed
+
+			if localPath == "" {
+				app.Printf("Missing parameter, see `help upload`\n")
+				return
+			}
+
+			src, _ := filepath.Abs(localPath)
+			_, err := os.Stat(src)
+			if err != nil {
+				app.Printf("%s\n", err)
+				return
+			}
+
+			if remotePath == "" {
+				fileName := filepath.Base(src)
+				remotePath = fileName
+			}
+			dst := remotePath
+
+			fileBuf, err := ioutil.ReadFile(src)
+			if err != nil {
+				app.Printf("%s\n", err)
+				return
+			}
+			uploadGzip := new(encoders.Gzip).Encode(fileBuf)
+			timeout, _ := strconv.Atoi(cmd.Flag("timeout").Value.String())
+			app.Printf("\n%s command sent to %d beacon(s)\n", strings.Split(cmd.Use, " ")[0], len(beacons))
+			AsyncBeacons(func(beacon string) error {
+				_, err := client.rpc.Upload(context.Background(), &sliverpb.UploadReq{
+					Request: &commonpb.Request{
+						Async:    true,
+						Timeout:  int64(timeout),
+						BeaconID: beacon,
+					},
+					Path:    dst,
+					Data:    uploadGzip,
+					Encoder: "gzip",
+					IsIOC:   isIOC,
+				})
+				if err != nil {
+					return err
+				}
+				return nil
+			}, beacons)
+		},
+	}
+	uploadCmd.Flags().IntP("timeout", "t", 60, "command timeout in seconds")
+	uploadCmd.Flags().BoolP("ioc", "i", false, "track uploaded file as an ioc")
 	for _, cmd := range rootCmd.Commands() {
 		c := carapace.Gen(cmd)
 
