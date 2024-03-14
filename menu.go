@@ -115,7 +115,8 @@ func menuCommands() *cobra.Command {
 		},
 	}
 	triggerCmd := &cobra.Command{
-		Use: "trigger",
+		Use:   "trigger",
+		Short: "List, add, import, or export, triggers based on existing impant profiles.",
 	}
 	triggerAddCmd := &cobra.Command{
 		Use:   "add [implant name]",
@@ -487,6 +488,8 @@ The beacon interval and jitter is tripled with the new implant profile to facili
 		rootCmd.CompletionOptions.DisableDefaultCmd = true
 		rootCmd.DisableFlagsInUseLine = true
 	*/
+	rootCmd.CompletionOptions.DisableDefaultCmd = true
+	rootCmd.DisableFlagsInUseLine = true
 	rootCmd.InitDefaultHelpCmd()
 	return rootCmd
 }
