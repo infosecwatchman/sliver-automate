@@ -6,12 +6,14 @@ replace github.com/desertbit/grumble v1.1.3 => github.com/moloch--/grumble v1.1.
 
 require (
 	github.com/bishopfox/sliver v1.5.41
+	github.com/briandowns/spinner v1.23.0
 	github.com/reeflective/console v0.1.15
 	github.com/reeflective/readline v1.0.14
 	github.com/rodaine/table v1.1.1
 	github.com/rsteube/carapace v0.50.0
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
+	github.com/tjarratt/babble v0.0.0-20210505082055-cbca2a4833c1
 	google.golang.org/grpc v1.62.0
 	gopkg.in/AlecAivazis/survey.v1 v1.8.8
 )
@@ -30,6 +32,8 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
+	github.com/onsi/ginkgo v1.16.5 // indirect
+	github.com/onsi/gomega v1.31.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rsteube/carapace-shlex v0.1.2 // indirect
 	github.com/sirupsen/logrus v1.9.2 // indirect

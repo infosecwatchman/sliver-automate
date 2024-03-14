@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/bishopfox/sliver/protobuf/clientpb"
 	"github.com/reeflective/console"
 	"github.com/reeflective/readline"
 	"log"
@@ -11,16 +12,34 @@ import (
 )
 
 var (
-	client SliverConnection
-	app    *console.Console
-	ctx    context.Context
+	client   SliverConnection
+	app      *console.Console
+	ctx      context.Context
+	triggers []trigger
 )
+
+type trigger struct {
+	ImplantName         string
+	ParentImplantName   string
+	NewBeaconJitter     int64
+	NewBeaconInterval   int64
+	ParentImplantConfig *clientpb.ImplantConfig
+	Filename            string
+	triggered           []triggeredType
+}
+
+type triggeredType struct {
+	Init           bool
+	ParentBeaconID string
+	uploadcount    int
+}
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	var configPath string
-	flag.StringVar(&configPath, "config", "", "path to sliver client config file")
-	flag.Parse()
+	flagset := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	flagset.StringVar(&configPath, "config", "", "path to sliver client config file")
+	flagset.Parse(os.Args[1:])
 	app = console.New("sliver-automate")
 	app.SetPrintLogo(func(_ *console.Console) {
 		fmt.Print(`

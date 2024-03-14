@@ -1,9 +1,12 @@
 package main
 
 import (
+	"github.com/briandowns/spinner"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 )
 
 func prettifyDownloadName(path string) string {
@@ -49,4 +52,31 @@ func AsyncBeacons(command func(beacon string) error, beacons []string) {
 		}(beacon)
 	}
 	beaconWG.Wait()
+}
+
+func writeFile(filename string, content []byte, perm os.FileMode) error {
+	// Write content to the file
+	err := os.WriteFile(filename, content, perm)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Until - Spin until ctrl channel signals
+func Until(msg string, ctrl chan bool) {
+	defer close(ctrl)
+	s := spinner.New(spinner.CharSets[4], 100*time.Millisecond)
+	s.Prefix = msg
+	s.Start()
+	for {
+		select {
+		case <-ctrl:
+			//fmt.Fprintf(stdout, "%s", clearln)
+			s.Stop()
+			ctrl <- true
+			return
+		}
+	}
 }
