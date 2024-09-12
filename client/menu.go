@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-func menuCommands() *cobra.Command {
+func MenuCommands() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "",
 		Short: "",
@@ -185,13 +185,13 @@ The beacon interval and jitter is tripled with the new implant profile to facili
 						elapsed := time.Since(start)
 						app.Printf("Build completed in %s\n", elapsed.Round(time.Second))
 
-						err = writeFile(file.File.Name, file.File.Data, os.FileMode(0755))
+						err = WriteFile(file.File.Name, file.File.Data, os.FileMode(0755))
 						if err != nil {
 							app.Printf("%s\n", err)
 							app.Printf("Trigger not created.\n")
 							return
 						}
-						triggers = append(triggers, trigger{
+						triggers = append(triggers, Trigger{
 							ImplantName:         newconfig.Name,
 							ParentImplantName:   sliverName,
 							NewBeaconJitter:     newconfig.BeaconJitter,
@@ -228,7 +228,7 @@ The beacon interval and jitter is tripled with the new implant profile to facili
 				app.Printf("%s does not exist.\n", cmd.Flag("filename").Value.String())
 				return
 			}
-			var importTriggers []trigger
+			var importTriggers []Trigger
 			triggerFile, err := os.ReadFile(cmd.Flag("filename").Value.String())
 			if err != nil {
 				app.Printf("%s\n", err)
@@ -260,7 +260,7 @@ The beacon interval and jitter is tripled with the new implant profile to facili
 							if err != nil {
 								app.Printf("Unable to download implant %s: %s\n", triggerIter.ImplantName, err)
 							}
-							err = writeFile(triggerIter.Filename, implantProfile.GetFile().Data, os.FileMode(0755))
+							err = WriteFile(triggerIter.Filename, implantProfile.GetFile().Data, os.FileMode(0755))
 							if err != nil {
 								app.Printf("%s\n", err)
 							}
@@ -287,7 +287,7 @@ The beacon interval and jitter is tripled with the new implant profile to facili
 				if err != nil {
 					app.Printf("%s\n", err)
 				}
-				err = writeFile(cmd.Flag("filename").Value.String(), triggerJson, os.FileMode(0666))
+				err = WriteFile(cmd.Flag("filename").Value.String(), triggerJson, os.FileMode(0666))
 				if err != nil {
 					app.Printf("%s\n", err)
 				}

@@ -15,20 +15,20 @@ var (
 	client   SliverConnection
 	app      *console.Console
 	ctx      context.Context
-	triggers []trigger
+	triggers []Trigger
 )
 
-type trigger struct {
+type Trigger struct {
 	ImplantName         string
 	ParentImplantName   string
 	NewBeaconJitter     int64
 	NewBeaconInterval   int64
 	ParentImplantConfig *clientpb.ImplantConfig
 	Filename            string
-	triggered           []triggeredType
+	triggered           []TriggeredType
 }
 
-type triggeredType struct {
+type TriggeredType struct {
 	Init           bool
 	ParentBeaconID string
 	uploadcount    int
@@ -58,9 +58,9 @@ func Interact() {
 	mainMenu.AddInterrupt(readline.ErrInterrupt, exitConsole)
 	mainMenu.AddHistorySourceFile("history", ".history")
 	interactMenu.AddHistorySourceFile("history", ".history")
-	mainMenu.SetCommands(menuCommands)
-	interactMenu.SetCommands(interactBeaconCommands)
-	client.sliverConnect(configPath)
+	mainMenu.SetCommands(MenuCommands)
+	interactMenu.SetCommands(InteractBeaconCommands)
+	client.SliverConnect(configPath)
 	apperr := app.Start()
 	if apperr != nil {
 		log.Fatal(apperr)

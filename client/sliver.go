@@ -24,7 +24,7 @@ type SliverConnection struct {
 	ln  *grpc.ClientConn
 }
 
-func makeRequest(session *clientpb.Session) *commonpb.Request {
+func MakeRequest(session *clientpb.Session) *commonpb.Request {
 	if session == nil {
 		return nil
 	}
@@ -35,10 +35,10 @@ func makeRequest(session *clientpb.Session) *commonpb.Request {
 	}
 }
 
-func (con *SliverConnection) sliverConnect(configPath string) {
+func (con *SliverConnection) SliverConnect(configPath string) {
 	var config *assets.ClientConfig
 	var err error
-	config = selectConfig()
+	config = SelectConfig()
 	if config == nil {
 		fmt.Println("Config not found in default location, using \"-config\" flag.")
 		// load the client configuration from the filesystem
@@ -79,7 +79,7 @@ func (con *SliverConnection) sliverConnect(configPath string) {
 					if len(triggers) != 0 {
 						for triggernum, triggerIter := range triggers {
 							if strings.Contains(string(event.Data[2:len(event.Data)/2]), triggerIter.ParentImplantName) {
-								triggers[triggernum].triggered = append(triggers[triggernum].triggered, triggeredType{
+								triggers[triggernum].triggered = append(triggers[triggernum].triggered, TriggeredType{
 									Init:           false,
 									ParentBeaconID: string(beaconID),
 									uploadcount:    1,

@@ -25,7 +25,7 @@ import (
 	"time"
 )
 
-func interactBeaconCommands() *cobra.Command {
+func InteractBeaconCommands() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "",
 		Short: "",
@@ -529,7 +529,7 @@ func interactBeaconCommands() *cobra.Command {
 						// Come up with a good file name - filters might make the filename ugly
 						implant, _ := client.rpc.GetBeacon(context.Background(), &clientpb.Beacon{ID: beacon})
 						implantName := implant.Name
-						fileName = fmt.Sprintf("%s_download_%s_%d.tar.gz", filepath.Base(implantName), filepath.Base(prettifyDownloadName(remotePath)), time.Now().Unix())
+						fileName = fmt.Sprintf("%s_download_%s_%d.tar.gz", filepath.Base(implantName), filepath.Base(PrettifyDownloadName(remotePath)), time.Now().Unix())
 					}
 					if runtime.GOOS == "windows" {
 						// Windows has a file path length of 260 characters
