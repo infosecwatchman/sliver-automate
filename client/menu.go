@@ -41,7 +41,7 @@ func MenuCommands() *cobra.Command {
 					return
 				}
 			}
-			beacons, err := client.rpc.GetBeacons(context.Background(), &commonpb.Empty{})
+			beacons, err := client.RPC.GetBeacons(context.Background(), &commonpb.Empty{})
 			if err != nil {
 				app.Printf("Error in getting beacons: %s", err)
 			}
@@ -126,7 +126,7 @@ matching the new beacon and appends a random string to the name to prevent infin
 The beacon interval and jitter is tripled with the new implant profile to facilitate 'long hall' callbacks.`,
 		Args: cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			builds, err := client.rpc.ImplantBuilds(context.Background(), &commonpb.Empty{})
+			builds, err := client.RPC.ImplantBuilds(context.Background(), &commonpb.Empty{})
 			if err != nil {
 				app.Printf("%s\n\n", err)
 			}
@@ -151,7 +151,7 @@ The beacon interval and jitter is tripled with the new implant profile to facili
 
 			if (answer == "Y") || (answer == "y") {
 
-				builds, err := client.rpc.ImplantBuilds(context.Background(), &commonpb.Empty{})
+				builds, err := client.RPC.ImplantBuilds(context.Background(), &commonpb.Empty{})
 				if err != nil {
 					app.Printf("%s\n\n", err)
 				}
@@ -174,7 +174,7 @@ The beacon interval and jitter is tripled with the new implant profile to facili
 
 						go Until(fmt.Sprintf("Compiling %s, please wait ... ", config.Name), ctrl)
 
-						file, err := client.rpc.Generate(context.Background(), &clientpb.GenerateReq{Config: newconfig})
+						file, err := client.RPC.Generate(context.Background(), &clientpb.GenerateReq{Config: newconfig})
 						if err != nil {
 							app.Printf("%s\n\n", err)
 						}
@@ -239,7 +239,7 @@ The beacon interval and jitter is tripled with the new implant profile to facili
 				app.Printf("%s\n", err)
 				return
 			}
-			builds, err := client.rpc.ImplantBuilds(context.Background(), &commonpb.Empty{})
+			builds, err := client.RPC.ImplantBuilds(context.Background(), &commonpb.Empty{})
 			if err != nil {
 				app.Printf("%s\n\n", err)
 			}
@@ -256,7 +256,7 @@ The beacon interval and jitter is tripled with the new implant profile to facili
 					if slices.Contains(implants, triggerIter.ImplantName) {
 						if _, err := os.Stat(triggerIter.Filename); errors.Is(err, os.ErrNotExist) {
 							app.Printf("%s does not exist. Redownloading implant...\n", triggerIter.Filename)
-							implantProfile, err := client.rpc.Regenerate(context.Background(), &clientpb.RegenerateReq{ImplantName: triggerIter.ImplantName})
+							implantProfile, err := client.RPC.Regenerate(context.Background(), &clientpb.RegenerateReq{ImplantName: triggerIter.ImplantName})
 							if err != nil {
 								app.Printf("Unable to download implant %s: %s\n", triggerIter.ImplantName, err)
 							}
@@ -328,7 +328,7 @@ The beacon interval and jitter is tripled with the new implant profile to facili
 					return
 				}
 			}
-			beacons, err := client.rpc.GetBeacons(context.Background(), &commonpb.Empty{})
+			beacons, err := client.RPC.GetBeacons(context.Background(), &commonpb.Empty{})
 			if err != nil {
 				app.Printf("Error in getting beacons: %s", err)
 			}
@@ -432,7 +432,7 @@ The beacon interval and jitter is tripled with the new implant profile to facili
 			*/
 			tbl := table.New("ID", "Name", "RemoteAddress", "PID", "Filename", "Username", "OS", "IsDead", "NextCheckin")
 
-			beacons, err := client.rpc.GetBeacons(context.Background(), &commonpb.Empty{})
+			beacons, err := client.RPC.GetBeacons(context.Background(), &commonpb.Empty{})
 			if err != nil {
 				app.Printf("Error in getting beacons: %s", err)
 			}
