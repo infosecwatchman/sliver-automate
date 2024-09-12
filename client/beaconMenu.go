@@ -50,7 +50,7 @@ func InteractBeaconCommands() *cobra.Command {
 			var parsedBeacons []string = beacons.([]string)
 			var longestbeacon int
 			for _, beacon := range parsedBeacons {
-				_, err := client.rpc.Kill(context.Background(), &sliverpb.KillReq{
+				_, err := client.RPC.Kill(context.Background(), &sliverpb.KillReq{
 					Force: true,
 					Request: &commonpb.Request{
 						Async:    true,
@@ -61,7 +61,7 @@ func InteractBeaconCommands() *cobra.Command {
 				if err != nil {
 					log.Fatal(err)
 				}
-				activebeacon, _ := client.rpc.GetBeacon(context.Background(), &clientpb.Beacon{ID: beacon})
+				activebeacon, _ := client.RPC.GetBeacon(context.Background(), &clientpb.Beacon{ID: beacon})
 				nextCheckin := time.Unix(activebeacon.NextCheckin, 0)
 				if !time.Unix(activebeacon.NextCheckin, 0).Before(time.Now()) {
 					if int(time.Until(nextCheckin).Round(time.Second).Seconds())+time.Unix(activebeacon.Jitter, 0).Second() > longestbeacon {
@@ -80,13 +80,13 @@ func InteractBeaconCommands() *cobra.Command {
 				for _, beacon := range beacons {
 					go func(beacon string) {
 						err := func(beacon string) error {
-							tasks, err := client.rpc.GetBeaconTasks(beaconTaskContext, &clientpb.Beacon{ID: beacon})
+							tasks, err := client.RPC.GetBeaconTasks(beaconTaskContext, &clientpb.Beacon{ID: beacon})
 							for _, task := range tasks.Tasks {
 								var check = false
 								for {
 									if task.State != "sent" {
 										time.Sleep(5 * time.Second)
-										task, err = client.rpc.GetBeaconTaskContent(beaconTaskContext, &clientpb.BeaconTask{BeaconID: beacon, ID: task.ID})
+										task, err = client.RPC.GetBeaconTaskContent(beaconTaskContext, &clientpb.BeaconTask{BeaconID: beacon, ID: task.ID})
 										if err != nil {
 											app.Printf("%s", err)
 										}
@@ -111,7 +111,7 @@ func InteractBeaconCommands() *cobra.Command {
 							app.Printf("%s", err)
 							timedoutbeacons++
 						}
-						_, err = client.rpc.RmBeacon(context.Background(), &clientpb.Beacon{ID: beacon})
+						_, err = client.RPC.RmBeacon(context.Background(), &clientpb.Beacon{ID: beacon})
 						if err != nil {
 							log.Fatal(err)
 						}
@@ -152,7 +152,7 @@ func InteractBeaconCommands() *cobra.Command {
 			beaconWG.Add(len(beacons))
 			for _, beacon := range beacons {
 				go func(beacon string) {
-					_, err := client.rpc.Execute(context.Background(), &sliverpb.ExecuteReq{
+					_, err := client.RPC.Execute(context.Background(), &sliverpb.ExecuteReq{
 						Request: &commonpb.Request{
 							Async:    true,
 							Timeout:  int64(60),
@@ -208,7 +208,7 @@ func InteractBeaconCommands() *cobra.Command {
 			timeout, _ := strconv.Atoi(cmd.Flag("timeout").Value.String())
 			for _, beacon := range beacons {
 				go func(beacon string) {
-					_, err := client.rpc.Task(context.Background(), &sliverpb.TaskReq{
+					_, err := client.RPC.Task(context.Background(), &sliverpb.TaskReq{
 						Data:     shellcodeBin,
 						RWXPages: cmd.Flag("rwx-pages").Changed,
 						Pid:      uint32(0),
@@ -254,7 +254,7 @@ func InteractBeaconCommands() *cobra.Command {
 			var beaconWG sync.WaitGroup
 			beaconWG.Add(len(beacons))
 			timeout, _ := strconv.Atoi(cmd.Flag("timeout").Value.String())
-			allBeacons, err := client.rpc.GetBeacons(context.Background(), &commonpb.Empty{})
+			allBeacons, err := client.RPC.GetBeacons(context.Background(), &commonpb.Empty{})
 			if err != nil {
 				app.Printf("Error in getting beacons: %s", err)
 			}
@@ -271,7 +271,7 @@ func InteractBeaconCommands() *cobra.Command {
 			app.Printf("\nSideloaded DLL sent to %d beacon(s)\n", len(beacons))
 			for _, beacon := range beacons {
 				go func(beacon string) {
-					_, err := client.rpc.Sideload(context.Background(), &sliverpb.SideloadReq{
+					_, err := client.RPC.Sideload(context.Background(), &sliverpb.SideloadReq{
 						Request: &commonpb.Request{
 							Async:    false,
 							Timeout:  int64(timeout),
@@ -326,7 +326,7 @@ func InteractBeaconCommands() *cobra.Command {
 			timeout, _ := strconv.Atoi(cmd.Flag("timeout").Value.String())
 			app.Printf("\nchmod command sent to %d beacon(s)\n", len(beacons))
 			AsyncBeacons(func(beacon string) error {
-				_, err := client.rpc.Chmod(context.Background(), &sliverpb.ChmodReq{
+				_, err := client.RPC.Chmod(context.Background(), &sliverpb.ChmodReq{
 					Request: &commonpb.Request{
 						Async:    true,
 						Timeout:  int64(timeout),
@@ -376,7 +376,7 @@ func InteractBeaconCommands() *cobra.Command {
 			timeout, _ := strconv.Atoi(cmd.Flag("timeout").Value.String())
 			app.Printf("\n%s command sent to %d beacon(s)\n", strings.Split(cmd.Use, " ")[0], len(beacons))
 			AsyncBeacons(func(beacon string) error {
-				_, err := client.rpc.Chown(context.Background(), &sliverpb.ChownReq{
+				_, err := client.RPC.Chown(context.Background(), &sliverpb.ChownReq{
 					Request: &commonpb.Request{
 						Async:    true,
 						Timeout:  int64(timeout),
@@ -442,7 +442,7 @@ func InteractBeaconCommands() *cobra.Command {
 			timeout, _ := strconv.Atoi(cmd.Flag("timeout").Value.String())
 			app.Printf("\n%s command sent to %d beacon(s)\n", strings.Split(cmd.Use, " ")[0], len(beacons))
 			AsyncBeacons(func(beacon string) error {
-				_, err := client.rpc.Chtimes(context.Background(), &sliverpb.ChtimesReq{
+				_, err := client.RPC.Chtimes(context.Background(), &sliverpb.ChtimesReq{
 					Request: &commonpb.Request{
 						Async:    true,
 						Timeout:  int64(timeout),
@@ -482,7 +482,7 @@ func InteractBeaconCommands() *cobra.Command {
 			timeout, _ := strconv.Atoi(cmd.Flag("timeout").Value.String())
 			app.Printf("\n%s command sent to %d beacon(s)\n", strings.Split(cmd.Use, " ")[0], len(beacons))
 			AsyncBeacons(func(beacon string) error {
-				download, err := client.rpc.Download(context.Background(), &sliverpb.DownloadReq{
+				download, err := client.RPC.Download(context.Background(), &sliverpb.DownloadReq{
 					Request: &commonpb.Request{
 						Async:    true,
 						Timeout:  int64(timeout),
@@ -527,7 +527,7 @@ func InteractBeaconCommands() *cobra.Command {
 				if err == nil && fi.IsDir() {
 					if download.IsDir {
 						// Come up with a good file name - filters might make the filename ugly
-						implant, _ := client.rpc.GetBeacon(context.Background(), &clientpb.Beacon{ID: beacon})
+						implant, _ := client.RPC.GetBeacon(context.Background(), &clientpb.Beacon{ID: beacon})
 						implantName := implant.Name
 						fileName = fmt.Sprintf("%s_download_%s_%d.tar.gz", filepath.Base(implantName), filepath.Base(PrettifyDownloadName(remotePath)), time.Now().Unix())
 					}
@@ -642,7 +642,7 @@ func InteractBeaconCommands() *cobra.Command {
 			timeout, _ := strconv.Atoi(cmd.Flag("timeout").Value.String())
 			app.Printf("\n%s command sent to %d beacon(s)\n", strings.Split(cmd.Use, " ")[0], len(beacons))
 			AsyncBeacons(func(beacon string) error {
-				_, err := client.rpc.Upload(context.Background(), &sliverpb.UploadReq{
+				_, err := client.RPC.Upload(context.Background(), &sliverpb.UploadReq{
 					Request: &commonpb.Request{
 						Async:    true,
 						Timeout:  int64(timeout),
