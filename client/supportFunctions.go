@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"github.com/briandowns/spinner"
@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func prettifyDownloadName(path string) string {
+func PrettifyDownloadName(path string) string {
 	nonAlphaNumericRegex, err := regexp.Compile("[^a-zA-Z0-9]+")
 	if err != nil {
 		// Well, we tried.
@@ -54,7 +54,7 @@ func AsyncBeacons(command func(beacon string) error, beacons []string) {
 	beaconWG.Wait()
 }
 
-func writeFile(filename string, content []byte, perm os.FileMode) error {
+func WriteFile(filename string, content []byte, perm os.FileMode) error {
 	// Write content to the file
 	err := os.WriteFile(filename, content, perm)
 	if err != nil {
